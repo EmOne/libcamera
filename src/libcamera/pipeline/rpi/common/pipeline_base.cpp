@@ -1157,7 +1157,7 @@ int CameraData::loadIPA(ipa::RPi::InitResult *result)
 		configurationFile = std::string(configFromEnv);
 	}
 
-	IPASettings settings(configurationFile, sensor_->model());
+	IPASettings settings(configurationFile, sensor_->entity()->name());
 	ipa::RPi::InitParams params;
 
 	ret = sensor_->sensorInfo(&params.sensorInfo);
