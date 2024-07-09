@@ -141,18 +141,7 @@ int32_t IpaBase::init(const IPASettings &settings, const InitParams &params, Ini
 	result->sensorConfig.hblankDelay = hblankDelay;
 	result->sensorConfig.sensorMetadata = sensorMetadata;
 
-	/* Load the tuning file for this sensor. */
-	int ret = controller_.read(settings.configurationFile.c_str());
-	if (ret) {
-		LOG(IPARPI, Error)
-			<< "Failed to load tuning data file "
-			<< settings.configurationFile;
-		return ret;
-	}
-
 	lensPresent_ = params.lensPresent;
-
-	controller_.initialise();
 
 	/* Return the controls handled by the IPA */
 	ControlInfoMap::Map ctrlMap = ipaControls;
@@ -207,39 +196,6 @@ int32_t IpaBase::configure(const IPACameraSensorInfo &sensorInfo, const ConfigPa
 	/* The pipeline handler passes out the mode's sensitivity. */
 	result->modeSensitivity = mode_.sensitivity;
 
-	if (firstStart_) {
-		/* Supply initial values for frame durations. */
-		applyFrameDurations(defaultMinFrameDuration, defaultMaxFrameDuration);
-
-		/* Supply initial values for gain and exposure. */
-		AgcStatus agcStatus;
-		agcStatus.shutterTime = defaultExposureTime;
-		agcStatus.analogueGain = defaultAnalogueGain;
-		applyAGC(&agcStatus, ctrls);
-
-		/*
-		 * Set the lens to the default (typically hyperfocal) position
-		 * on first start.
-		 */
-		if (lensPresent_) {
-			RPiController::AfAlgorithm *af =
-				dynamic_cast<RPiController::AfAlgorithm *>(controller_.getAlgorithm("af"));
-
-			if (af) {
-				float defaultPos =
-					ipaAfControls.at(&controls::LensPosition).def().get<float>();
-				ControlList lensCtrl(lensCtrls_);
-				int32_t hwpos;
-
-				af->setLensPosition(defaultPos, &hwpos);
-				lensCtrl.set(V4L2_CID_FOCUS_ABSOLUTE, hwpos);
-				result->lensControls = std::move(lensCtrl);
-			}
-		}
-	}
-
-	result->sensorControls = std::move(ctrls);
-
 	/*
 	 * Apply the correct limits to the exposure, gain and frame duration controls
 	 * based on the current sensor mode.
@@ -270,6 +226,22 @@ int32_t IpaBase::configure(const IPACameraSensorInfo &sensorInfo, const ConfigPa
 	return platformConfigure(params, result);
 }
 
+int32_t IpaBase::setTuning(const std::string &configurationFile)
+{
+	/* Load the tuning file for this sensor. */
+	int ret = controller_.read(configurationFile.c_str());
+	if (ret) {
+		LOG(IPARPI, Error)
+			<< "Failed to load tuning data file "
+			<< configurationFile;
+		return ret;
+	}
+
+	controller_.initialise();
+
+	return 0;
+}
+
 void IpaBase::start(const ControlList &controls, StartResult *result)
 {
 	RPiController::Metadata metadata;
@@ -295,7 +267,7 @@ void IpaBase::start(const ControlList &controls, StartResult *result)
 	if (agcStatus.shutterTime && agcStatus.analogueGain) {
 		ControlList ctrls(sensorCtrls_);
 		applyAGC(&agcStatus, ctrls);
-		result->controls = std::move(ctrls);
+		result->sensorControls = std::move(ctrls);
 		setCameraTimeoutValue();
 	}
 	/* Make a note of this as it tells us the HDR status of the first few frames. */
@@ -338,6 +310,26 @@ void IpaBase::start(const ControlList &controls, StartResult *result)
 
 		dropFrameCount_ = std::max({ dropFrameCount_, agcConvergenceFrames, awbConvergenceFrames });
 		LOG(IPARPI, Debug) << "Drop " << dropFrameCount_ << " frames on startup";
+
+		/*
+		 * Set the lens to the default (typically hyperfocal) position
+		 * on first start.
+		 */
+		if (lensPresent_) {
+			RPiController::AfAlgorithm *af =
+				dynamic_cast<RPiController::AfAlgorithm *>(controller_.getAlgorithm("af"));
+
+			if (af) {
+				float defaultPos =
+					ipaAfControls.at(&controls::LensPosition).def().get<float>();
+				ControlList lensCtrl(lensCtrls_);
+				int32_t hwpos;
+
+				af->setLensPosition(defaultPos, &hwpos);
+				lensCtrl.set(V4L2_CID_FOCUS_ABSOLUTE, hwpos);
+				result->lensControls = std::move(lensCtrl);
+			}
+		}
 	} else {
 		dropFrameCount_ = helper_->hideFramesModeSwitch();
 		mistrustCount_ = helper_->mistrustFramesModeSwitch();

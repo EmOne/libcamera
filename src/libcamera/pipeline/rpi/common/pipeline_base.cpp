@@ -634,14 +634,35 @@ int PipelineHandlerBase::start(Camera *camera, const ControlList *controls)
 	if (controls)
 		data->applyScalerCrop(*controls);
 
+	/*
+	 * The configuration (tuning file) is made from the sensor name unless
+	 * the environment variable overrides it.
+	 */
+	if (!data->configurationFile_.empty()) {
+		std::string configurationFile;
+		char const *configFromEnv = utils::secure_getenv("LIBCAMERA_RPI_TUNING_FILE");
+		if (!configFromEnv || *configFromEnv == '\0') {
+			std::string model = data->sensor_->model();
+			if (isMonoSensor(data->sensor_))
+				model += "_mono";
+			data->configurationFile_ = data->ipa_->configurationFile(model + ".json");
+		} else {
+			data->configurationFile_ = std::string(configFromEnv);
+		}
+
+		data->ipa_->setTuning(data->configurationFile_);
+	}
+
 	/* Start the IPA. */
 	ipa::RPi::StartResult result;
 	data->ipa_->start(controls ? *controls : ControlList{ controls::controls },
 			  &result);
 
 	/* Apply any gain/exposure settings that the IPA may have passed back. */
-	if (!result.controls.empty())
-		data->setSensorControls(result.controls);
+	if (!result.sensorControls.empty())
+		data->setSensorControls(result.sensorControls);
+	if (!result.lensControls.empty())
+		data->setLensControls(result.lensControls);
 
 	/* Configure the number of dropped frames required on startup. */
 	data->dropFrameCount_ = data->config_.disableStartupFrameDrops
@@ -1142,22 +1163,7 @@ int CameraData::loadIPA(ipa::RPi::InitResult *result)
 	if (!ipa_)
 		return -ENOENT;
 
-	/*
-	 * The configuration (tuning file) is made from the sensor name unless
-	 * the environment variable overrides it.
-	 */
-	std::string configurationFile;
-	char const *configFromEnv = utils::secure_getenv("LIBCAMERA_RPI_TUNING_FILE");
-	if (!configFromEnv || *configFromEnv == '\0') {
-		std::string model = sensor_->model();
-		if (isMonoSensor(sensor_))
-			model += "_mono";
-		configurationFile = ipa_->configurationFile(model + ".json");
-	} else {
-		configurationFile = std::string(configFromEnv);
-	}
-
-	IPASettings settings(configurationFile, sensor_->model());
+	IPASettings settings({}, sensor_->model());
 	ipa::RPi::InitParams params;
 
 	ret = sensor_->sensorInfo(&params.sensorInfo);
@@ -1204,11 +1210,6 @@ int CameraData::configureIPA(const CameraConfiguration *config, ipa::RPi::Config
 		LOG(RPI, Error) << "IPA configuration failed!";
 		return -EPIPE;
 	}
-
-	if (!result->sensorControls.empty())
-		setSensorControls(result->sensorControls);
-	if (!result->lensControls.empty())
-		setLensControls(result->lensControls);
 
 	return 0;
 }
