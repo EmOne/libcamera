@@ -270,6 +270,7 @@ private:
 int32_t IpaPiSP::platformInit(const InitParams &params,
 			      [[maybe_unused]] InitResult *result)
 {
+	#if 0
 	const std::string &target = controller_.getTarget();
 	if (target != "pisp") {
 		LOG(IPARPI, Error)
@@ -277,6 +278,7 @@ int32_t IpaPiSP::platformInit(const InitParams &params,
 			<< ", expected \"pisp\"";
 		return -EINVAL;
 	}
+	#endif
 
 	/* Acquire the Frontend and Backend objects. */
 	feFD_ = std::move(params.fe);

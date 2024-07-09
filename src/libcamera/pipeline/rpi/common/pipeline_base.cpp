@@ -638,7 +638,7 @@ int PipelineHandlerBase::start(Camera *camera, const ControlList *controls)
 	 * The configuration (tuning file) is made from the sensor name unless
 	 * the environment variable overrides it.
 	 */
-	if (!data->configurationFile_.empty()) {
+	if (data->configurationFile_.empty()) {
 		std::string configurationFile;
 		char const *configFromEnv = utils::secure_getenv("LIBCAMERA_RPI_TUNING_FILE");
 		if (!configFromEnv || *configFromEnv == '\0') {

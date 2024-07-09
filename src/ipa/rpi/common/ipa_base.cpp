@@ -540,6 +540,7 @@ void IpaBase::setMode(const IPACameraSensorInfo &sensorInfo)
 	 * hardware capabilities. If it does, try adjusting the minimum line
 	 * length to compensate if possible.
 	 */
+	#if 0
 	Duration minPixelTime = controller_.getHardwareConfig().minPixelProcessingTime;
 	Duration pixelTime = mode_.minLineLength / mode_.width;
 	if (minPixelTime && pixelTime < minPixelTime) {
@@ -561,6 +562,7 @@ void IpaBase::setMode(const IPACameraSensorInfo &sensorInfo)
 				<< "Please update the camera sensor driver to allow more horizontal blanking control.";
 		}
 	}
+	#endif
 
 	/*
 	 * Set the frame length limits for the mode to ensure exposure and
