@@ -52,6 +52,12 @@ public:
 	}
 
 private:
+	const std::string &platformName() const override
+	{
+		static const std::string name("bcm2835");
+		return name;
+	}
+
 	int32_t platformInit(const InitParams &params, InitResult *result) override;
 	int32_t platformStart(const ControlList &controls, StartResult *result) override;
 	int32_t platformConfigure(const ConfigParams &params, ConfigResult *result) override;

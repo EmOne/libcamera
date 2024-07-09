@@ -212,6 +212,12 @@ public:
 	}
 
 private:
+	const std::string &platformName() const override
+	{
+		static const std::string name("pisp");
+		return name;
+	}
+
 	int32_t platformInit(const InitParams &params, InitResult *result) override;
 	int32_t platformStart(const ControlList &controls, StartResult *result) override;
 	int32_t platformConfigure(const ConfigParams &params, ConfigResult *result) override;
@@ -270,16 +276,6 @@ private:
 int32_t IpaPiSP::platformInit(const InitParams &params,
 			      [[maybe_unused]] InitResult *result)
 {
-	#if 0
-	const std::string &target = controller_.getTarget();
-	if (target != "pisp") {
-		LOG(IPARPI, Error)
-			<< "Tuning data file target returned \"" << target << "\""
-			<< ", expected \"pisp\"";
-		return -EINVAL;
-	}
-	#endif
-
 	/* Acquire the Frontend and Backend objects. */
 	feFD_ = std::move(params.fe);
 	beFD_ = std::move(params.be);
@@ -309,6 +305,14 @@ int32_t IpaPiSP::platformInit(const InitParams &params,
 int32_t IpaPiSP::platformStart([[maybe_unused]] const ControlList &controls,
 			       [[maybe_unused]] StartResult *result)
 {
+	const std::string &target = controller_.getTarget();
+	if (target != "pisp") {
+		LOG(IPARPI, Error)
+			<< "Tuning data file target returned \"" << target << "\""
+			<< ", expected \"pisp\"";
+		return -EINVAL;
+	}
+
 	tdnReset_ = true;
 
 	/* Cause the stitch block to be reset correctly. */

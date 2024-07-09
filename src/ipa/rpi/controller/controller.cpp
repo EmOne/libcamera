@@ -53,7 +53,6 @@ static const std::map<std::string, Controller::HardwareConfig> HardwareConfigMap
 			.numGammaPoints = 64,
 			.pipelineWidth = 16,
 			.statsInline = true,
-
 			/*
 			 * The constraint below is on the rate of pixels going
 			 * from CSI2 peripheral to ISP-FE (400Mpix/s, plus tiny
@@ -209,7 +208,12 @@ const std::string &Controller::getTarget() const
 
 const Controller::HardwareConfig &Controller::getHardwareConfig() const
 {
-	auto cfg = HardwareConfigMap.find(getTarget());
+	return getHardwareConfig(getTarget());
+}
+
+const Controller::HardwareConfig &Controller::getHardwareConfig(const std::string &target)
+{
+	auto cfg = HardwareConfigMap.find(target);
 
 	/*
 	 * This really should not happen, the IPA ought to validate the target
