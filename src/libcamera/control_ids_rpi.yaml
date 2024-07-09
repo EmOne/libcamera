@@ -37,4 +37,10 @@ controls:
 
         \sa StatsOutputEnable
 
+  - CameraTuningFile:
+      type: string
+      description: |
+        Custom tuning configuration file to be used for the camera. This control
+        must be set on Camera::start().
+
 ...
