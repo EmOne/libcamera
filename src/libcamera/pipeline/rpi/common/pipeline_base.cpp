@@ -653,7 +653,12 @@ int PipelineHandlerBase::start(Camera *camera, const ControlList *controls)
 				model += "_mono";
 			data->configurationFile_ = data->ipa_->configurationFile(model + ".json");
 		}
-		data->ipa_->setTuning(data->configurationFile_);
+
+		ret = data->ipa_->setTuning(data->configurationFile_);
+		if (ret) {
+			LOG(RPI, Error) << "Failed to set tuning file in the IPA library";
+			return ret;
+		}
 	}
 
 	/* Start the IPA. */
