@@ -24,6 +24,7 @@
 #include <libcamera/orientation.h>
 #include <libcamera/request.h>
 #include <libcamera/stream.h>
+#include <libcamera/transform.h>
 
 namespace libcamera {
 
@@ -94,6 +95,8 @@ public:
 
 	std::optional<SensorConfiguration> sensorConfig;
 	Orientation orientation;
+
+	libcamera::Transform transform;
 
 protected:
 	CameraConfiguration();
