@@ -8,6 +8,7 @@
 #include "pipeline_base.h"
 
 #include <chrono>
+#include <sys/stat.h>
 
 #include <linux/media-bus-format.h>
 #include <linux/videodev2.h>
@@ -83,6 +84,26 @@ std::optional<ColorSpace> findValidColorSpace(const ColorSpace &colourSpace)
 	}
 
 	return std::nullopt;
+}
+
+static void set_64mp_pipeline_configuration(std::string platform)
+{
+	// Otherwise point it at whichever of these we find first (if any) for the given platform.
+	static const std::vector<std::pair<std::string, std::string>> config_files = {
+		{ "vc4", "/usr/local/share/libcamera/pipeline/rpi/vc4/arducam_64mp.yaml" },
+		{ "vc4", "/usr/share/libcamera/pipeline/rpi/vc4/arducam_64mp.yaml" },
+	};
+
+	for (auto &config_file : config_files)
+	{
+		struct stat info;
+		if (config_file.first == platform && stat(config_file.second.c_str(), &info) == 0)
+		{
+			
+			setenv("LIBCAMERA_RPI_CONFIG_FILE", config_file.second.c_str(), 1);
+			break;
+		}
+	}
 }
 
 } /* namespace */
@@ -838,6 +859,10 @@ int PipelineHandlerBase::registerCamera(std::unique_ptr<RPi::CameraData> &camera
 	if (ret)
 		return ret;
 
+	std::string camera_model = data->sensor_->model();
+	if (camera_model == "ov64a40" || camera_model == "arducam_64mp")
+		set_64mp_pipeline_configuration(target_);
+
 	ret = data->loadPipelineConfiguration();
 	if (ret) {
 		LOG(RPI, Error) << "Unable to load pipeline configuration";
@@ -1157,7 +1182,7 @@ int CameraData::loadIPA(ipa::RPi::InitResult *result)
 		configurationFile = std::string(configFromEnv);
 	}
 
-	IPASettings settings(configurationFile, sensor_->model());
+	IPASettings settings(configurationFile, sensor_->entity()->name());
 	ipa::RPi::InitParams params;
 
 	ret = sensor_->sensorInfo(&params.sensorInfo);
@@ -1166,7 +1191,16 @@ int CameraData::loadIPA(ipa::RPi::InitResult *result)
 		return ret;
 	}
 
-	params.lensPresent = !!sensor_->focusLens();
+	if (!sensor_->focusLens()) {
+		ControlInfoMap sensorControls = sensor_->controls();
+		auto iter = sensorControls.find(V4L2_CID_FOCUS_ABSOLUTE);
+		if (iter != sensorControls.end()) {
+			params.lensPresent = true;
+		}
+	} else {
+		params.lensPresent = !!sensor_->focusLens();
+	}
+
 	ret = platformInitIpa(params);
 	if (ret)
 		return ret;
@@ -1182,6 +1216,11 @@ int CameraData::configureIPA(const CameraConfiguration *config, ipa::RPi::Config
 	params.sensorControls = sensor_->controls();
 	if (sensor_->focusLens())
 		params.lensControls = sensor_->focusLens()->controls();
+	else {
+		auto iter = params.sensorControls.find(V4L2_CID_FOCUS_ABSOLUTE);
+		if (iter != params.sensorControls.end())
+			params.lensControls = sensor_->controls();
+	}
 
 	ret = platformConfigureIpa(params);
 	if (ret)
@@ -1256,6 +1295,15 @@ void CameraData::setLensControls(const ControlList &controls)
 	if (lens && controls.contains(V4L2_CID_FOCUS_ABSOLUTE)) {
 		ControlValue const &focusValue = controls.get(V4L2_CID_FOCUS_ABSOLUTE);
 		lens->setFocusPosition(focusValue.get<int32_t>());
+	} else {
+		ControlInfoMap sensorControls = sensor_->controls();
+		auto iter = sensorControls.find(V4L2_CID_FOCUS_ABSOLUTE);
+		if (iter != sensorControls.end()) {
+			ControlValue const &focusValue = controls.get(V4L2_CID_FOCUS_ABSOLUTE);
+			ControlList lensCtrls(sensor_->controls());
+			lensCtrls.set(V4L2_CID_FOCUS_ABSOLUTE, static_cast<int32_t>(focusValue.get<int32_t>()));
+			sensor_->setControls(&lensCtrls);
+		}
 	}
 }
 
